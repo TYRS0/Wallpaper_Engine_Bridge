@@ -319,12 +319,14 @@ def download_image(url):
 # ==================== NEW LOG TRACKING ENGINE ====================
 
 def process_log_line(line):
-    """Matches raw URLs inside lines from your original log configuration."""
-    url_match = re.search(r'(https?://\S+)', line)
-    if url_match:
-        url = url_match.group(1)
-        print(f"[Original Log] Detected URL target: {url}")
-        download_image(url)
+    """Only extracts and downloads URLs if the line contains a changeWallpaper command."""
+    # Ensure the specific command keyword is present in the log line
+    if "changewallpaper" in line.lower():
+        url_match = re.search(r'(https?://\S+)', line)
+        if url_match:
+            url = url_match.group(1)
+            print(f"[Original Log] Confirmed changeWallpaper target URL: {url}")
+            download_image(url)
 
 def monitor_original_log():
     """Background worker tracking your original commands.log file."""
