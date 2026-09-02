@@ -9,9 +9,9 @@ Setup
   6) Run pip install requests apng pillow
   7) Download the .py file from this Github
   8) Open .py file and change Configurations
-     • LOG_FILE_PATH = (Your CtrlEm commands.log File)
-     • DOWNLOAD_DIR = (Folder to use to cache Wallpapers)
-     • DAILY_LOG_FOLDER = (Your Playctrl.me logs Folder)
+     • CTRLEM_LOG_PATH = (Your CtrlEm commands.log File)
+     • WALLPAPER_WORKSPACE_DIR = (Folder to use to cache Wallpapers)
+     • PLAYCTRL_LOG_FOLDER = (Your Playctrl.me logs Folder)
      • WE_EXE_PATH = (Path to wallpaper engine .exe) *Already pathed to Steam Default Installation
      • MONITOR_WIDTH / HEIGHT = (Size of your monitor) *Dual Monitor Might work, I have 16/10 and 16/9 monitors and looks fine, your mileage may vary
   10) run File
