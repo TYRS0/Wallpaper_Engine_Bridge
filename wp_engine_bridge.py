@@ -255,66 +255,98 @@ def cleanup_old_wallpapers(current_new_filename):
         print(f"[Cleanup] Directory sweep error: {e}")
 
 def download_image(url):
-    """Downloads the file and enforces uniform padding sizing rules across all formats."""
+    """Downloads files using system curl and routes video formats natively."""
     try:
-        response = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
-        if response.status_code == 200:
-            ext = detect_extension(response)
-            base_filename = f"wallpaper_{int(time.time())}"
-            save_path = os.path.join(DOWNLOAD_DIR, base_filename + ext)
+        # Check the URL to identify the correct extension format
+        clean_url = url.split('?')[0].lower()
+        if clean_url.endswith('.webp'):
+            ext = '.webp'
+        elif clean_url.endswith('.gif'):
+            ext = '.gif'
+        elif clean_url.endswith('.apng'):
+            ext = '.apng'
+        elif clean_url.endswith('.webm'):
+            ext = '.webm'  # Added native video tracking support
+        elif clean_url.endswith('.mp4'):
+            ext = '.mp4'
+        else:
+            ext = '.png'
             
-            with open(save_path, 'wb') as f:
-                f.write(response.content)
-            
-            if ext == '.apng':
-                print("APNG detected. Converting to padded GIF format...")
+        base_filename = f"wallpaper_{int(time.time())}"
+        save_path = os.path.join(DOWNLOAD_DIR, base_filename + ext)
+        
+        print(f"[Downloader] Spawning background terminal stream for secure CDN download...")
+        
+        # Windows terminal curl execution with wrapped URL parameters
+        curl_command = f'curl -s -L --max-time 25 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" "{url}" -o "{save_path}"'
+        subprocess.run(curl_command, shell=True, check=True, capture_output=True)
+        
+        if not os.path.exists(save_path) or os.path.getsize(save_path) < 1000:
+            print("[Downloader] Error: File failed to pull or returned an empty payload stream.")
+            if os.path.exists(save_path):
+                os.remove(save_path)
+            return
+
+        # ==================== VIDEO FILE PASSTHROUGH ====================
+        if ext in ['.webm', '.mp4']:
+            print(f"Video format ({ext.upper()}) detected. Bypassing image pad processing...")
+            # Clear old image cache files out of your workspace folder
+            cleanup_old_wallpapers(base_filename + ext)
+            # Pass the video file path directly to Wallpaper Engine's core CLI engine
+            update_wallpaper_engine(save_path)
+            return
+        # ================================================================
+
+        # Core Routing Pipeline - Reuse your established PIL sizing algorithms
+        if ext == '.apng':
+            print("APNG detected. Converting to padded GIF format...")
+            gif_name = base_filename + ".gif"
+            gif_path = os.path.join(DOWNLOAD_DIR, gif_name)
+            if convert_apng_to_padded_gif(save_path, gif_path):
+                if os.path.exists(save_path):
+                    os.remove(save_path)
+                cleanup_old_wallpapers(gif_name)
+                update_wallpaper_engine(gif_path)
+                
+        elif ext in ['.gif', '.webp']:
+            is_animated = False
+            try:
+                with Image.open(save_path) as test_img:
+                    if getattr(test_img, "is_animated", False) and test_img.n_frames > 1:
+                        is_animated = True
+            except Exception:
+                pass
+
+            if is_animated:
+                print(f"Animated format ({ext}) detected. Standardizing layout padding...")
                 gif_name = base_filename + ".gif"
                 gif_path = os.path.join(DOWNLOAD_DIR, gif_name)
-                if convert_apng_to_padded_gif(save_path, gif_path):
-                    if os.path.exists(save_path):
+                if pad_animated_image(save_path, gif_path):
+                    if ext == '.webp' and os.path.exists(save_path):
                         os.remove(save_path)
-                    # Trigger cache purger for old files before launching new one
                     cleanup_old_wallpapers(gif_name)
                     update_wallpaper_engine(gif_path)
-                    
-            elif ext in ['.gif', '.webp']:
-                is_animated = False
-                try:
-                    with Image.open(save_path) as test_img:
-                        if getattr(test_img, "is_animated", False) and test_img.n_frames > 1:
-                            is_animated = True
-                except Exception:
-                    pass
-
-                if is_animated:
-                    print(f"Animated format ({ext}) detected. Standardizing layout padding...")
-                    gif_name = base_filename + ".gif"
-                    gif_path = os.path.join(DOWNLOAD_DIR, gif_name)
-                    if pad_animated_image(save_path, gif_path):
-                        if ext == '.webp' and os.path.exists(save_path):
-                            os.remove(save_path)
-                        # Trigger cache purger for old files before launching new one
-                        cleanup_old_wallpapers(gif_name)
-                        update_wallpaper_engine(gif_path)
-                else:
-                    print(f"Static {ext.upper()} asset detected. Transcoding to padded JPG container...")
-                    jpg_name = base_filename + ".jpg"
-                    jpg_path = os.path.join(DOWNLOAD_DIR, jpg_name)
-                    
-                    if pad_static_image(save_path, output_path=jpg_path):
-                        if os.path.exists(save_path):
-                            os.remove(save_path)
-                        # Trigger cache purger for old files before launching new one
-                        cleanup_old_wallpapers(jpg_name)
-                        update_wallpaper_engine(jpg_path)
             else:
-                print("Static asset (JPG/PNG) detected. Executing flat image fit...")
-                if pad_static_image(save_path):
-                    # Trigger cache purger for old files before launching new one
-                    cleanup_old_wallpapers(base_filename + ext)
-                    update_wallpaper_engine(save_path)
+                print(f"Static {ext.upper()} asset detected. Transcoding to padded JPG container...")
+                jpg_name = base_filename + ".jpg"
+                jpg_path = os.path.join(DOWNLOAD_DIR, jpg_name)
+                
+                if pad_static_image(save_path, output_path=jpg_path):
+                    if os.path.exists(save_path):
+                        os.remove(save_path)
+                    cleanup_old_wallpapers(jpg_name)
+                    update_wallpaper_engine(jpg_path)
+        else:
+            print(f"Static asset ({ext.upper()}) detected. Executing flat image fit...")
+            if pad_static_image(save_path):
+                cleanup_old_wallpapers(base_filename + ext)
+                update_wallpaper_engine(save_path)
+                
+    except subprocess.CalledProcessError as e:
+        print(f"[Downloader] Active background process failure: {e}")
     except Exception as e:
-        print(f"Error handling download and transformation pipeline: {e}")
+        print(f"[Downloader] Processing exception handled: {e}")
+
 
 # ==================== NEW LOG TRACKING ENGINE ====================
 
