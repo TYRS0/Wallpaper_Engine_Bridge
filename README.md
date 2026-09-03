@@ -28,8 +28,9 @@ Setup
 7. Download the Wallpaper Bridge from [Latest Releases](https://github.com/TYRS0/Wallpaper_Engine_Bridge/releases/latest)
 8. Run gui.pyw
 9. Configure settings page
-	-  **CtrlEm Log** = (Your CtrlEm commands.log File)
+	- **CtrlEm Log** = (Your CtrlEm commands.log File)
 	- **CtrlEm Exe Path** = (Your CtrlEm .exe File)
+	- **WE EXE Path** = (Path to Wallpaper Engine .exe) *Steam's default installation is prefilled*
 	- **PlayCtrl Log Folder** = (Your Playctrl.me Logs Folder)
 	- **PlayCtrl Exe Path** = (Your Playctrl.me .exe File)
 	- **Monitor Size** = (Size of your monitor) *Dual Monitor might work, I have 16/10 and 16/9 monitors and looks fine, your mileage may vary*
