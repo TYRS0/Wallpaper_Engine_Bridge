@@ -8,14 +8,13 @@ import threading
 from PIL import Image, ImageSequence
 from apng import APNG
 
-# --- LOCAL SCRIPT CONSTANTS ---
+# --- ENGINE TRACKING SCHEMATICS ---
 PLAYCTRL_LOG_PATTERN = "*.txt"
-
-# --- DYNAMIC CONFIGURATION INITIALIZATION ---
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+gui_instance = None  
 
 def load_application_config():
-    """Loads configuration fields dynamically from a local json file tracker, creating defaults if empty or missing."""
+    """Hydrates local execution spaces with fail-safe defaults if config is corrupted or empty."""
     default_config = {
         "CTRLEM_LOG_PATH": "",
         "CTRLEM_EXE_PATH": "",
@@ -32,7 +31,6 @@ def load_application_config():
         "THEME_TEXT": "#f0f0f8"
     }
 
-    # If file doesn't exist, create it with baseline default fields
     if not os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(default_config, f, indent=4)
@@ -41,120 +39,116 @@ def load_application_config():
     try:
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             content = f.read().strip()
-            if not content:  # Catch completely empty file errors cleanly
-                raise json.JSONDecodeError("File empty", "", 0)
+            if not content:
+                raise json.JSONDecodeError("File blank", "", 0)
             
             loaded_config = json.loads(content)
-            # Patch missing keys dynamically if an incomplete JSON structure was passed
             for key, val in default_config.items():
                 if key not in loaded_config:
                     loaded_config[key] = val
             return loaded_config
-            
     except (json.JSONDecodeError, FileNotFoundError):
-        # Overwrite corrupted/blank text directly back with the solid default dict matrix
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(default_config, f, indent=4)
         return default_config
 
-# Safe unpacking loop execution structure
+# Hot-reload mapping variables globally
 config = load_application_config()
 CTRLEM_LOG_PATH = config["CTRLEM_LOG_PATH"]
 PLAYCTRL_LOG_FOLDER = config["PLAYCTRL_LOG_FOLDER"]
-# FIX: Automatically looks up the script's exact folder and appends your custom workspace directory name safely
-script_directory = os.path.dirname(os.path.abspath(__file__))
-WALLPAPER_WORKSPACE_DIR = os.path.join(script_directory, "TempDownloads")
 WE_EXE_PATH = config["WE_EXE_PATH"]
 MONITOR_WIDTH = int(config.get("MONITOR_WIDTH", 1920))
 MONITOR_HEIGHT = int(config.get("MONITOR_HEIGHT", 1080))
-DEBUG_MODE = config.get("DEBUG_MODE", True)
-CTRLEM_EXE_PATH = config.get("CTRLEM_EXE_PATH", "")
-PLAYCTRL_EXE_PATH = config.get("PLAYCTRL_EXE_PATH", "")
+DEBUG_MODE = config.get("DEBUG_MODE", False)
+CTRLEM_EXE_PATH = config["CTRLEM_EXE_PATH"]
+PLAYCTRL_EXE_PATH = config["PLAYCTRL_EXE_PATH"]
 
+WALLPAPER_WORKSPACE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "TempDownloads")
 if not os.path.exists(WALLPAPER_WORKSPACE_DIR):
     os.makedirs(WALLPAPER_WORKSPACE_DIR)
- 
-# --- GLOBAL GUI HOOK INTERFACES ---
-gui_instance = None  # Will hold the running UI reference window dynamically
 
+def format_log_entry(text, is_debug, source_app, source_group):
+    """Isolates the string layout rendering logic from multi-thread I/O contexts."""
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    if not is_debug and source_app and source_group:
+        return f"[{timestamp}] changed by {source_group} {{{source_app}}}"
+    elif DEBUG_MODE or is_debug:
+        prefix = f"[{source_app}] " if source_app else ""
+        return f"[{timestamp}] {prefix}{text}"
+    return None
 
 def log_message(text, is_debug=True, source_app=None, source_group=None):
-    """Handles structured logging formats based on the current debug profile status."""
+    """Routes runtime summary messages directly down onto active GUI consoles."""
     global gui_instance
-    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    formatted_msg = ""
+    formatted_msg = format_log_entry(text, is_debug, source_app, source_group)
     
-    if not is_debug and source_app and source_group:
-        formatted_msg = f"[{timestamp}] changed by {source_group} {{{source_app}}}"
-    elif DEBUG_MODE or is_debug: # Catch debug logs cleanly
-        prefix = f"[{source_app}] " if source_app else ""
-        formatted_msg = f"[{timestamp}] {prefix}{text}"
-
     if formatted_msg:
         print(formatted_msg)
         if gui_instance is not None:
             try:
-                # FIX: Pass the is_debug status flag up to the GUI router
                 gui_instance.write_to_console(formatted_msg + "\n", is_debug_message=is_debug)
             except Exception:
                 pass
 
+def get_windows_startup_info():
+    """Generates shell flags to explicitly block window flickering on desktop hosts."""
+    if os.name == 'nt' and not DEBUG_MODE:
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+        return startupinfo
+    return None
 
 def update_wallpaper_engine(image_path):
     """Tells Wallpaper Engine to immediately apply the file via CLI."""
     if not os.path.exists(WE_EXE_PATH):
-        log_message(f"Error: wallpaper64.exe not found at {WE_EXE_PATH}", is_debug=True)
+        log_message(f"Error: wallpaper64.exe missing at {WE_EXE_PATH}", is_debug=True)
         return
 
-    # FIX: Add a brief sleep to ensure the file system has unlocked the image resource completely
     time.sleep(0.2)
-
     command = [WE_EXE_PATH, "-control", "openWallpaper", "-file", image_path]
     try:
-        startupinfo = None
-        if os.name == 'nt' and not DEBUG_MODE:
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
-
-        subprocess.run(command, check=True, capture_output=True, startupinfo=startupinfo)
+        subprocess.run(
+            command, check=True, capture_output=True, 
+            startupinfo=get_windows_startup_info()
+        )
         log_message("Wallpaper Engine canvas updated.", is_debug=True)
     except Exception as e:
         log_message(f"Failed to communicate with Wallpaper Engine: {e}", is_debug=True)
 
+def calculate_padded_dimensions(width, height):
+    """Calculates scaling profiles to perfectly preserve physical aspect limits."""
+    img_ratio = width / height
+    monitor_ratio = MONITOR_WIDTH / MONITOR_HEIGHT
+    
+    if img_ratio > monitor_ratio:
+        new_w = MONITOR_WIDTH
+        new_h = int(MONITOR_WIDTH / img_ratio)
+    else:
+        new_h = MONITOR_HEIGHT
+        new_w = int(MONITOR_HEIGHT * img_ratio)
+        
+    paste_x = (MONITOR_WIDTH - new_w) // 2
+    paste_y = (MONITOR_HEIGHT - new_h) // 2
+    return new_w, new_h, paste_x, paste_y
+
 def pad_static_image(image_path, output_path=None):
-    """Pads a static image and ensures it saves safely without decimal crop issues."""
+    """Pads a static image and ensures it saves safely without dimensional precision drifting."""
     try:
         save_path = output_path if output_path else image_path
         with Image.open(image_path) as img:
             if img.width == MONITOR_WIDTH and img.height == MONITOR_HEIGHT:
-                log_message("Static image matches resolution perfectly. Bypassing processing math...", is_debug=True)
-                if save_path.lower().endswith(('.jpg', '.jpeg')):
-                    img.convert("RGB").save(save_path, "JPEG", quality=95)
-                else:
-                    img.save(save_path)
+                log_message("Static resolution matches. Bypassing scaling.", is_debug=True)
+                img.convert("RGB").save(save_path, "JPEG", quality=95) if save_path.lower().endswith(('.jpg', '.jpeg')) else img.save(save_path)
                 return True
 
-            img_ratio = img.width / img.height
-            monitor_ratio = MONITOR_WIDTH / MONITOR_HEIGHT
-            
-            if img_ratio > monitor_ratio:
-                new_w = MONITOR_WIDTH
-                new_h = int(MONITOR_WIDTH / img_ratio)
-            else:
-                new_h = MONITOR_HEIGHT
-                new_w = int(MONITOR_HEIGHT * img_ratio)
-                
+            new_w, new_h, paste_x, paste_y = calculate_padded_dimensions(img.width, img.height)
             resized_img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
             background = Image.new("RGB", (MONITOR_WIDTH, MONITOR_HEIGHT), (0, 0, 0))
-            
-            paste_x = (MONITOR_WIDTH - new_w) // 2
-            paste_y = (MONITOR_HEIGHT - new_h) // 2
             background.paste(resized_img, (paste_x, paste_y))
             
             if save_path.lower().endswith(('.jpg', '.jpeg')):
-                background = background.convert("RGB")
-                background.save(save_path, "JPEG", quality=95)
+                background.convert("RGB").save(save_path, "JPEG", quality=95)
             else:
                 background.save(save_path)
             return True
@@ -163,57 +157,33 @@ def pad_static_image(image_path, output_path=None):
         return False
 
 def pad_animated_image(img_path, output_gif_path=None):
-    """Resizes and pads an animated GIF/WebP frame-by-frame without decimal precision drifting."""
+    """Resizes and pads an animated GIF/WebP frame-by-frame without canvas bleed bugs."""
     try:
         target_path = output_gif_path if output_gif_path else img_path
         with Image.open(img_path) as im:
-            img_w, img_h = im.size
-
-            if img_w == MONITOR_WIDTH and img_h == MONITOR_HEIGHT:
-                log_message("Animated asset matches resolution perfectly. Bypassing processing math...", is_debug=True)
-                loop = im.info.get('loop', 0)
-                durations = []
-                frames = []
-                for frame in ImageSequence.Iterator(im):
-                    durations.append(frame.info.get('duration', 100))
-                    frames.append(frame.copy().convert("P", palette=Image.Palette.ADAPTIVE))
+            if im.size == (MONITOR_WIDTH, MONITOR_HEIGHT):
+                log_message("Animation resolution matches. Bypassing processing.", is_debug=True)
+                frames = [f.copy().convert("P", palette=Image.Palette.ADAPTIVE) for f in ImageSequence.Iterator(im)]
                 if frames:
-                    # FIX: Call .save() on the first element of the list, not the list itself
-                    frames[0].save(target_path, save_all=True, append_images=frames[1:], optimize=True, duration=durations, loop=loop)
+                    frames[0].save(target_path, save_all=True, append_images=frames[1:], optimize=True, loop=im.info.get('loop', 0))
                 return True
 
-            monitor_ratio = MONITOR_WIDTH / MONITOR_HEIGHT
-            img_ratio = img_w / img_h
-            if img_ratio > monitor_ratio:
-                new_w = MONITOR_WIDTH
-                new_h = int(MONITOR_WIDTH / img_ratio)
-            else:
-                new_h = MONITOR_HEIGHT
-                new_w = int(MONITOR_HEIGHT * img_ratio)
-
-            paste_x = (MONITOR_WIDTH - new_w) // 2
-            paste_y = (MONITOR_HEIGHT - new_h) // 2
-            loop = im.info.get('loop', 0)
-            padded_frames = []
-            durations = []
-            canvas_frame = Image.new("RGBA", (img_w, img_h))
+            new_w, new_h, px, py = calculate_padded_dimensions(im.width, im.height)
+            padded_frames, durations = [], []
+            canvas_frame = Image.new("RGBA", im.size)
 
             for frame in ImageSequence.Iterator(im):
                 durations.append(frame.info.get('duration', 100))
-                if frame.mode in ('RGBA', 'LA') or (frame.mode == 'P' and 'transparency' in frame.info):
-                    canvas_frame.paste(frame, frame.getbbox() or (0, 0), frame.convert("RGBA"))
-                else:
-                    canvas_frame.paste(frame, frame.getbbox() or (0, 0))
+                mask = frame.convert("RGBA") if frame.mode in ('RGBA', 'LA') or (frame.mode == 'P' and 'transparency' in frame.info) else None
+                canvas_frame.paste(frame, frame.getbbox() or (0, 0), mask)
                 
-                resized_frame = canvas_frame.resize((new_w, new_h), Image.Resampling.LANCZOS).convert("RGBA")
+                resized = canvas_frame.resize((new_w, new_h), Image.Resampling.LANCZOS).convert("RGBA")
                 bg = Image.new("RGBA", (MONITOR_WIDTH, MONITOR_HEIGHT), (0, 0, 0, 255))
-                bg.paste(resized_frame, (paste_x, paste_y), resized_frame)
+                bg.paste(resized, (px, py), resized)
                 padded_frames.append(bg.convert("P", palette=Image.Palette.ADAPTIVE))
 
             if padded_frames:
-                # FIX: Call .save() on the first element of the list, not the list itself
-                padded_frames[0].save(target_path, save_all=True, append_images=padded_frames[1:], optimize=True, duration=durations, loop=loop)
-                log_message("Animated asset successfully padded.", is_debug=True)
+                padded_frames[0].save(target_path, save_all=True, append_images=padded_frames[1:], optimize=True, duration=durations, loop=im.info.get('loop', 0))
                 return True
     except Exception as e:
         log_message(f"Failed to pad animated file: {e}", is_debug=True)
@@ -224,107 +194,74 @@ def convert_apng_to_padded_gif(apng_path, gif_path):
     try:
         im = APNG.open(apng_path)
         frames = []
-        with open("temp_size.png", "wb") as f:
-            im.frames.save(f)
+        
+        im.frames[0][0].save("temp_size.png")
         with Image.open("temp_size.png") as first_img:
             img_w, img_h = first_img.size
         if os.path.exists("temp_size.png"):
             os.remove("temp_size.png")
 
         if img_w == MONITOR_WIDTH and img_h == MONITOR_HEIGHT:
-            log_message("APNG matches resolution perfectly. Flat transcode converting...", is_debug=True)
-            for png_frame, control in im.frames:
-                with open("temp_frame.png", "wb") as f:
-                    png_frame.save(f)
+            for png_frame, _ in im.frames:
+                png_frame.save("temp_frame.png")
                 frames.append(Image.open("temp_frame.png").convert("P", palette=Image.Palette.ADAPTIVE))
         else:
-            monitor_ratio = MONITOR_WIDTH / MONITOR_HEIGHT
-            img_ratio = img_w / img_h
-            if img_ratio > monitor_ratio:
-                new_w = MONITOR_WIDTH
-                new_h = int(MONITOR_WIDTH / img_ratio)
-            else:
-                new_h = MONITOR_HEIGHT
-                new_w = int(MONITOR_HEIGHT * img_ratio)
-
-            paste_x = (MONITOR_WIDTH - new_w) // 2
-            paste_y = (MONITOR_HEIGHT - new_h) // 2
-
-            for png_frame, control in im.frames:
-                with open("temp_frame.png", "wb") as f:
-                    png_frame.save(f)
-                resized_frame = Image.open("temp_frame.png").resize((new_w, new_h), Image.Resampling.LANCZOS).convert("RGBA")
+            nw, nh, px, py = calculate_padded_dimensions(img_w, img_h)
+            for png_frame, _ in im.frames:
+                png_frame.save("temp_frame.png")
+                resized = Image.open("temp_frame.png").resize((nw, nh), Image.Resampling.LANCZOS).convert("RGBA")
                 bg = Image.new("RGBA", (MONITOR_WIDTH, MONITOR_HEIGHT), (0, 0, 0, 255))
-                bg.paste(resized_frame, (paste_x, paste_y), resized_frame)
+                bg.paste(resized, (px, py), resized)
                 frames.append(bg.convert("P", palette=Image.Palette.ADAPTIVE))
             
         if frames:
-            frames.save(gif_path, save_all=True, append_images=frames[1:], optimize=True, duration=[c.delay for _, c in im.frames], loop=0)
+            frames[0].save(gif_path, save_all=True, append_images=frames[1:], optimize=True, duration=[c.delay for _, c in im.frames], loop=0)
         if os.path.exists("temp_frame.png"):
             os.remove("temp_frame.png")
         return True
     except Exception as e:
-        log_message(f"APNG to padded GIF conversion failed: {e}", is_debug=True)
+        log_message(f"APNG conversion failed: {e}", is_debug=True)
         if os.path.exists("temp_frame.png"):
             os.remove("temp_frame.png")
         return False
 
-def cleanup_workspace_wallpapers(active_filename):
-    """Deletes old files in the scratch folder while preserving the live background asset."""
+def get_clean_extension(url):
+    """Parses raw text strings to identify incoming formatting types."""
+    url_split = url.split('?')
+    clean_url = url_split[0].lower() if url_split else url.lower()
+    for ext in ['.webp', '.gif', '.apng', '.webm', '.mp4']:
+        if clean_url.endswith(ext):
+            return ext
+    return '.png'
+
+def verify_image_integrity(save_path):
+    """Performs a lightweight structure check on files to discard broken items."""
     try:
-        for filename in os.listdir(WALLPAPER_WORKSPACE_DIR):
-            file_path = os.path.join(WALLPAPER_WORKSPACE_DIR, filename)
-            if not os.path.isfile(file_path) or filename == active_filename:
-                continue
-            try:
-                os.remove(file_path)
-            except PermissionError:
-                pass 
-    except Exception as e:
-        log_message(f"[Cleanup] Directory sweep error: {e}", is_debug=True)
+        with Image.open(save_path) as verify_img:
+            verify_img.verify()
+        return True
+    except Exception:
+        return False
 
 def download_and_route_asset(url, source_app, source_group):
     """Downloads files via curl and handles asset routing based on format styles."""
     try:
-        # Extract the base URL before query parameters, then convert to lowercase safely
-        url_split_data = url.split('?')
-        clean_url = url_split_data[0].lower() if url_split_data else url.lower()
-        
-        if clean_url.endswith('.webp'): ext = '.webp'
-        elif clean_url.endswith('.gif'): ext = '.gif'
-        elif clean_url.endswith('.apng'): ext = '.apng'
-        elif clean_url.endswith('.webm'): ext = '.webm'
-        elif clean_url.endswith('.mp4'): ext = '.mp4'
-        else: ext = '.png'
-            
+        ext = get_clean_extension(url)
         base_filename = f"wallpaper_{int(time.time())}"
         save_path = os.path.join(WALLPAPER_WORKSPACE_DIR, base_filename + ext)
         
-        # Build standard terminal suppression flags
-        startupinfo = None
-        if os.name == 'nt' and not DEBUG_MODE:
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
-
         curl_command = f'curl -s -L --max-time 25 -A "Mozilla/5.0" "{url}" -o "{save_path}"'
-        subprocess.run(curl_command, shell=True, check=True, capture_output=True, startupinfo=startupinfo)
+        subprocess.run(curl_command, shell=True, check=True, capture_output=True, startupinfo=get_windows_startup_info())
         
         if not os.path.exists(save_path) or os.path.getsize(save_path) < 1000:
             if os.path.exists(save_path): os.remove(save_path)
             return
 
-        # 🛠️ FIX: Pre-verify that the downloaded asset is a valid, uncorrupted file structure
-        if ext not in ['.webm', '.mp4']:
-            try:
-                with Image.open(save_path) as verify_img:
-                    verify_img.verify() # Checks file integrity without loading data into memory
-            except Exception:
-                log_message(f"Downloaded asset from {source_app} is corrupted or not a valid image file.", is_debug=True, source_app=source_app)
-                if os.path.exists(save_path): os.remove(save_path)
-                return
+        if ext not in ['.webm', '.mp4'] and not verify_image_integrity(save_path):
+            log_message(f"Corrupted download from {source_app}.", is_debug=True, source_app=source_app)
+            if os.path.exists(save_path): os.remove(save_path)
+            return
 
-        # Fire clean short-format output summary string
         log_message(None, is_debug=False, source_app=source_app, source_group=source_group)
 
         if ext in ['.webm', '.mp4']:
@@ -333,159 +270,95 @@ def download_and_route_asset(url, source_app, source_group):
             return
 
         if ext == '.apng':
-            gif_name = base_filename + ".gif"
-            gif_path = os.path.join(WALLPAPER_WORKSPACE_DIR, gif_name)
+            gif_path = os.path.join(WALLPAPER_WORKSPACE_DIR, base_filename + ".gif")
             if convert_apng_to_padded_gif(save_path, gif_path):
                 if os.path.exists(save_path): os.remove(save_path)
-                cleanup_workspace_wallpapers(gif_name)
+                cleanup_workspace_wallpapers(base_filename + ".gif")
                 update_wallpaper_engine(gif_path)
             return
 
         is_animated = False
-        try:
-            # Re-open the image file cleanly to read animation property details
-            with Image.open(save_path) as test_img:
-                if getattr(test_img, "is_animated", False) and test_img.n_frames > 1:
-                    is_animated = True
-        except Exception: 
-            pass
+        with Image.open(save_path) as test_img:
+            if getattr(test_img, "is_animated", False) and test_img.n_frames > 1:
+                is_animated = True
 
         if is_animated:
-            log_message("Animation frames verified. Forcing animated pipeline...", is_debug=True, source_app=source_app)
-            gif_name = base_filename + ".gif"
-            gif_path = os.path.join(WALLPAPER_WORKSPACE_DIR, gif_name)
+            gif_path = os.path.join(WALLPAPER_WORKSPACE_DIR, base_filename + ".gif")
             if pad_animated_image(save_path, gif_path):
                 if os.path.exists(save_path): os.remove(save_path)
-                cleanup_workspace_wallpapers(gif_name)
+                cleanup_workspace_wallpapers(base_filename + ".gif")
                 update_wallpaper_engine(gif_path)
         else:
-            jpg_name = base_filename + ".jpg"
-            jpg_path = os.path.join(WALLPAPER_WORKSPACE_DIR, jpg_name)
+            jpg_path = os.path.join(WALLPAPER_WORKSPACE_DIR, base_filename + ".jpg")
             if pad_static_image(save_path, output_path=jpg_path):
                 if os.path.exists(save_path): os.remove(save_path)
-                cleanup_workspace_wallpapers(jpg_name)
+                cleanup_workspace_wallpapers(base_filename + ".jpg")
                 update_wallpaper_engine(jpg_path)
     except Exception as e:
-        log_message(f"Processing exception handled: {e}", is_debug=True, source_app=source_app)
+        log_message(f"Processing error: {e}", is_debug=True, source_app=source_app)
 
+def cleanup_workspace_wallpapers(active_filename):
+    """Sweeps directory structures clean of stale wallpaper fragments."""
+    try:
+        for filename in os.listdir(WALLPAPER_WORKSPACE_DIR):
+            file_path = os.path.join(WALLPAPER_WORKSPACE_DIR, filename)
+            if os.path.isfile(file_path) and filename != active_filename:
+                try:
+                    os.remove(file_path)
+                except PermissionError:
+                    pass
+    except Exception as e:
+        log_message(f"Cleanup error: {e}", is_debug=True)
 
 def process_ctrlem_log_line(line):
-    """Filters CtrlEm entries. Falls back to 'Unknown Profile' if group/api context is absent."""
+    """Filters and decodes incoming command string elements from CtrlEm logs."""
     if "changewallpaper" in line.lower():
         url_match = re.search(r'(https?://\S+)', line)
         if not url_match:
             return
 
         url = url_match.group(1)
-        
-        # Check if explicitly issued via 'api'
         if "sent by api" in line.lower():
-            log_message(f"API command verified: {url}", is_debug=True, source_app="CtrlEm")
+            log_message(f"API command: {url}", is_debug=True, source_app="CtrlEm")
             download_and_route_asset(url, source_app="CtrlEm", source_group="API")
             return
             
-        # Parse out (sent by Person_ID (Group: Group_Name))
         group_match = re.search(r'\(sent by .*?\(Group:\s*(.*?)\)\)', line, re.IGNORECASE)
-        if group_match:
-            group_name = group_match.group(1).strip()
-            log_message(f"Group command verified: {group_name} -> {url}", is_debug=True, source_app="CtrlEm")
-            download_and_route_asset(url, source_app="CtrlEm", source_group=group_name)
-        else:
-            # Fallback to process individual/unknown logs instead of ignoring them
-            log_message(f"Individual/Unknown command captured: {url}", is_debug=True, source_app="CtrlEm")
-            download_and_route_asset(url, source_app="CtrlEm", source_group="Unknown Profile")
-
-def monitor_playctrl_daily_json_streams():
-    """Asynchronously parses incoming multi-line JSON blocks out of PlayCtrl client outputs."""
-    log_message(f"Monitoring client directory: {PLAYCTRL_LOG_FOLDER}", is_debug=True, source_app="PlayCtrl")
-    current_file = None
-    f = None
-    json_buffer = ""
-    inside_json = False
-    current_group = "Unknown Profile"  # Holds the extracted header group name
-
-    while True:
-        latest_file = get_latest_playctrl_daily_file()
-        if latest_file and latest_file != current_file:
-            log_message(f"Hot-swapping reader instance targets: {os.path.basename(latest_file)}", is_debug=True, source_app="PlayCtrl")
-            if f: f.close()
-            current_file = latest_file
-            f = open(current_file, "r", encoding="utf-8", errors="ignore")
-            f.seek(0, os.SEEK_END)
-            json_buffer = ""
-            inside_json = False
-            current_group = "Unknown Profile"
-
-        if not f:
-            time.sleep(5)
-            continue
-
-        line = f.readline()
-        if not line:
-            time.sleep(1)
-            continue
-
-        stripped_line = line.strip()
-        if stripped_line.startswith("----") and "type=set_wallpaper" in stripped_line:
-            inside_json = True
-            json_buffer = ""
-            
-            # Extract group="..." from the log header line if present
-            group_match = re.search(r'group=["\'](.*?)["\']', stripped_line)
-            if group_match:
-                current_group = group_match.group(1).strip()
-            else:
-                current_group = "Unknown Profile"
-            continue
-
-        if inside_json:
-            json_buffer += line
-            if stripped_line == "}":
-                try:
-                    payload = json.loads(json_buffer)
-                    if "url" in payload:
-                        # Fallback check: Use payload value if present, otherwise use header group
-                        group_name = payload.get("group", current_group)
-                        if not group_name:
-                            group_name = "Unknown Profile"
-                            
-                        log_message(f"Extracted group wallpaper target: {payload['url']}", is_debug=True, source_app="PlayCtrl")
-                        download_and_route_asset(payload["url"], source_app="PlayCtrl.me", source_group=group_name)
-                except Exception: 
-                    pass
-                finally:
-                    inside_json = False
-                    json_buffer = ""
-                    current_group = "Unknown Profile"
+        group_name = group_match.group(1).strip() if group_match else "Unknown Profile"
+        log_message(f"Command localized: {group_name} -> {url}", is_debug=True, source_app="CtrlEm")
+        download_and_route_asset(url, source_app="CtrlEm", source_group=group_name)
 
 def get_latest_playctrl_daily_file():
     """Identifies the newest dynamic tracking file inside the PlayCtrl logging target folder."""
-    search_path = os.path.join(PLAYCTRL_LOG_FOLDER, PLAYCTRL_LOG_PATTERN)
-    files = glob.glob(search_path)
-    if not files: 
-        return None
-    return max(files, key=os.path.getmtime)
+    files = glob.glob(os.path.join(PLAYCTRL_LOG_FOLDER, PLAYCTRL_LOG_PATTERN))
+    return max(files, key=os.path.getmtime) if files else None
+
+def parse_buffered_playctrl_json(buffer, fallback_group):
+    """Validates multi-line payload text and hands valid configurations down to loaders."""
+    try:
+        payload = json.loads(buffer)
+        if "url" in payload:
+            group_name = str(payload.get("group", fallback_group)).strip()
+            if not group_name:
+                group_name = "Unknown Profile"
+            log_message(f"Extracted json target: {payload['url']}", is_debug=True, source_app="PlayCtrl")
+            download_and_route_asset(payload["url"], source_app="PlayCtrl.me", source_group=group_name)
+    except Exception:
+        pass
 
 def monitor_playctrl_daily_json_streams():
     """Asynchronously parses incoming multi-line JSON blocks out of PlayCtrl client outputs."""
-    log_message(f"Monitoring client directory: {PLAYCTRL_LOG_FOLDER}", is_debug=True, source_app="PlayCtrl")
-    current_file = None
-    f = None
-    json_buffer = ""
-    inside_json = False
-    current_group = "Unknown Profile"
+    log_message(f"Watching PlayCtrl directory: {PLAYCTRL_LOG_FOLDER}", is_debug=True, source_app="PlayCtrl")
+    current_file, f, json_buffer, inside_json, current_group = None, None, "", False, "Unknown Profile"
 
     while True:
         latest_file = get_latest_playctrl_daily_file()
         if latest_file and latest_file != current_file:
-            log_message(f"Hot-swapping reader instance targets: {os.path.basename(latest_file)}", is_debug=True, source_app="PlayCtrl")
             if f: f.close()
             current_file = latest_file
             f = open(current_file, "r", encoding="utf-8", errors="ignore")
             f.seek(0, os.SEEK_END)
-            json_buffer = ""
-            inside_json = False
-            current_group = "Unknown Profile"
+            json_buffer, inside_json = "", False
 
         if not f:
             time.sleep(5)
@@ -496,47 +369,23 @@ def monitor_playctrl_daily_json_streams():
             time.sleep(1)
             continue
 
-        stripped_line = line.strip()
-        if stripped_line.startswith("----") and "type=set_wallpaper" in stripped_line:
+        stripped = line.strip()
+        if stripped.startswith("----") and "type=set_wallpaper" in stripped:
             inside_json = True
             json_buffer = ""
-            
-            # Extract group="..." from the log header line if present
-            group_match = re.search(r'group=["\'](.*?)["\']', stripped_line)
-            if group_match:
-                current_group = group_match.group(1).strip()
-            else:
-                current_group = "Unknown Profile"
+            group_match = re.search(r'group=["\'](.*?)["\']', stripped)
+            current_group = group_match.group(1).strip() if group_match else "Unknown Profile"
             continue
 
         if inside_json:
             json_buffer += line
-            if stripped_line == "}":
-                try:
-                    payload = json.loads(json_buffer)
-                    if "url" in payload:
-                        # FIX: Prioritize payload group only if it's a valid, non-empty string
-                        payload_group = payload.get("group")
-                        if payload_group and str(payload_group).strip():
-                            group_name = str(payload_group).strip()
-                        else:
-                            group_name = current_group
-
-                        if not group_name:
-                            group_name = "Unknown Profile"
-                            
-                        log_message(f"Extracted group wallpaper target: {payload['url']}", is_debug=True, source_app="PlayCtrl")
-                        download_and_route_asset(payload["url"], source_app="PlayCtrl.me", source_group=group_name)
-                except Exception: 
-                    pass
-                finally:
-                    inside_json = False
-                    json_buffer = ""
-                    current_group = "Unknown Profile"
+            if stripped == "}":
+                parse_buffered_playctrl_json(json_buffer, current_group)
+                inside_json = False
 
 def monitor_ctrlem_command_stream():
     """Asynchronously tails the static CtrlEm commands.log file structure."""
-    log_message(f"Launching watch on: {CTRLEM_LOG_PATH}", is_debug=True, source_app="CtrlEm")
+    log_message(f"Watching CtrlEm log: {CTRLEM_LOG_PATH}", is_debug=True, source_app="CtrlEm")
     while True:
         if os.path.exists(CTRLEM_LOG_PATH):
             with open(CTRLEM_LOG_PATH, "r", encoding="utf-8", errors="ignore") as f:
@@ -547,5 +396,4 @@ def monitor_ctrlem_command_stream():
                         time.sleep(1)
                         continue
                     process_ctrlem_log_line(line)
-        else:
-            time.sleep(5)
+        time.sleep(5)
