@@ -18,18 +18,18 @@ def load_application_config():
     """Loads configuration fields dynamically from a local json file tracker, creating defaults if empty or missing."""
     default_config = {
         "CTRLEM_LOG_PATH": "",
+        "CTRLEM_EXE_PATH": "",
         "PLAYCTRL_LOG_FOLDER": "",
+        "PLAYCTRL_EXE_PATH": "",
         "WE_EXE_PATH": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\wallpaper_engine\\wallpaper64.exe",
         "MONITOR_WIDTH": 1920,
         "MONITOR_HEIGHT": 1080,
-        "DEBUG_MODE": false,
-        "THEME_ACCENT": "#dc322f",
-        "THEME_BASE": "#002a35",
-        "THEME_SURFACE": "#053542",
-        "THEME_ELEVATED": "#05313d",
-        "THEME_TEXT": "#ffffff",
-        "CTRLEM_EXE_PATH": "",
-        "PLAYCTRL_EXE_PATH": ""
+        "DEBUG_MODE": False,
+        "THEME_ACCENT": "#a855f7",
+        "THEME_BASE": "#0f0f13",
+        "THEME_SURFACE": "#16161d",
+        "THEME_ELEVATED": "#1e1e2a",
+        "THEME_TEXT": "#f0f0f8"
     }
 
     # If file doesn't exist, create it with baseline default fields
@@ -315,6 +315,16 @@ def download_and_route_asset(url, source_app, source_group):
             if os.path.exists(save_path): os.remove(save_path)
             return
 
+        # 🛠️ FIX: Pre-verify that the downloaded asset is a valid, uncorrupted file structure
+        if ext not in ['.webm', '.mp4']:
+            try:
+                with Image.open(save_path) as verify_img:
+                    verify_img.verify() # Checks file integrity without loading data into memory
+            except Exception:
+                log_message(f"Downloaded asset from {source_app} is corrupted or not a valid image file.", is_debug=True, source_app=source_app)
+                if os.path.exists(save_path): os.remove(save_path)
+                return
+
         # Fire clean short-format output summary string
         log_message(None, is_debug=False, source_app=source_app, source_group=source_group)
 
@@ -334,6 +344,7 @@ def download_and_route_asset(url, source_app, source_group):
 
         is_animated = False
         try:
+            # Re-open the image file cleanly to read animation property details
             with Image.open(save_path) as test_img:
                 if getattr(test_img, "is_animated", False) and test_img.n_frames > 1:
                     is_animated = True
@@ -357,6 +368,7 @@ def download_and_route_asset(url, source_app, source_group):
                 update_wallpaper_engine(jpg_path)
     except Exception as e:
         log_message(f"Processing exception handled: {e}", is_debug=True, source_app=source_app)
+
 
 def process_ctrlem_log_line(line):
     """Filters CtrlEm entries. Falls back to 'Unknown Profile' if group/api context is absent."""
