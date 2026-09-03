@@ -34,6 +34,6 @@ Setup
 	- **PlayCtrl Log Folder** = (Your Playctrl.me Logs Folder)
 	- **PlayCtrl Exe Path** = (Your Playctrl.me .exe File)
 	- **Monitor Size** = (Size of your monitor) *Dual Monitor might work, I have 16/10 and 16/9 monitors and looks fine, your mileage may vary*
-	- **Toggle Debug Mode** = (outputs extra information to console)
+	- **Toggle Debug Mode** = (Shows Debug Console)
 10. Click Save
 </details>

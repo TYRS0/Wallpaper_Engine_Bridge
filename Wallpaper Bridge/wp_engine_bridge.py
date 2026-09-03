@@ -85,21 +85,20 @@ def log_message(text, is_debug=True, source_app=None, source_group=None):
     formatted_msg = ""
     
     if not is_debug and source_app and source_group:
-        # Production short-format
         formatted_msg = f"[{timestamp}] changed by {source_group} {{{source_app}}}"
-    elif DEBUG_MODE:
+    elif DEBUG_MODE or is_debug: # Catch debug logs cleanly
         prefix = f"[{source_app}] " if source_app else ""
         formatted_msg = f"[{timestamp}] {prefix}{text}"
 
     if formatted_msg:
-        # Send to standard terminal display
         print(formatted_msg)
-        # Safely mirror text onto the running GUI console panel if active
         if gui_instance is not None:
             try:
-                gui_instance.write_to_console(formatted_msg + "\n")
+                # FIX: Pass the is_debug status flag up to the GUI router
+                gui_instance.write_to_console(formatted_msg + "\n", is_debug_message=is_debug)
             except Exception:
                 pass
+
 
 def update_wallpaper_engine(image_path):
     """Tells Wallpaper Engine to immediately apply the file via CLI."""
