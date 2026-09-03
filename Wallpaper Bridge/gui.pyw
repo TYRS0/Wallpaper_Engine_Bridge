@@ -345,28 +345,30 @@ class WallpaperBridgeGUI(ctk.CTk):
         for view_id, pane in self.panes.items():
             if view_id == target_view:
                 pane.grid(row=0, column=1, padx=15, pady=15, sticky="nsew")
-                self.nav_buttons[view_id].configure(fg_color=self.theme_colors["accent"], text_color="#ffffff")
+                self.nav_buttons[view_id].configure(
+                    fg_color=self.theme_colors["accent"], text_color="#ffffff"
+                )
             else:
                 pane.grid_forget()
-                self.nav_buttons[view_id].configure(fg_color="transparent", text_color="#a0b0b5")
+                self.nav_buttons[view_id].configure(
+                    fg_color="transparent", text_color="#a0b0b5"
+                )
 
     def load_settings_into_ui(self):
-        """Hydrates GUI entry inputs safely with live config variables, handling empty fields."""
+        """Hydrates GUI entry inputs safely with live config.json variables."""
         try:
-            # Safely insert tracking fields, defaulting to an empty string if missing
-            self.entry_ctrlem.insert(0, getattr(wp_engine_bridge, "CTRLEM_LOG_PATH", ""))
-            self.entry_playctrl.insert(0, getattr(wp_engine_bridge, "PLAYCTRL_LOG_FOLDER", ""))
-            self.entry_width.insert(0, str(getattr(wp_engine_bridge, "MONITOR_WIDTH", 1920)))
-            self.entry_height.insert(0, str(getattr(wp_engine_bridge, "MONITOR_HEIGHT", 1080)))
-            self.entry_ctrlem_exe.insert(0, getattr(wp_engine_bridge, "CTRLEM_EXE_PATH", ""))
-            self.entry_playctrl_exe.insert(0, getattr(wp_engine_bridge, "PLAYCTRL_EXE_PATH", ""))
+            self.entry_ctrlem.insert(0, wp_engine_bridge.CTRLEM_LOG_PATH)
+            self.entry_playctrl.insert(0, wp_engine_bridge.PLAYCTRL_LOG_FOLDER)
+            self.entry_width.insert(0, str(wp_engine_bridge.MONITOR_WIDTH))
+            self.entry_height.insert(0, str(wp_engine_bridge.MONITOR_HEIGHT))
+            self.entry_ctrlem_exe.insert(0, wp_engine_bridge.CTRLEM_EXE_PATH)
+            self.entry_playctrl_exe.insert(0, wp_engine_bridge.PLAYCTRL_EXE_PATH)
 
-            if getattr(wp_engine_bridge, "DEBUG_MODE", True):
+            if getattr(wp_engine_bridge, "DEBUG_MODE", False):
                 self.switch_debug.select()
             else:
                 self.switch_debug.deselect()
             
-            # Re-verify layout fallback configurations
             self.theme_colors["accent"] = wp_engine_bridge.config.get("THEME_ACCENT", "#dc322f")
             self.theme_colors["base_dark"] = wp_engine_bridge.config.get("THEME_BASE", "#002a35")
             self.theme_colors["surface_panel"] = wp_engine_bridge.config.get("THEME_SURFACE", "#053542")
@@ -392,16 +394,67 @@ class WallpaperBridgeGUI(ctk.CTk):
         self.swatch_elevated.configure(fg_color=self.theme_colors["elevated_card"])
         self.swatch_text.configure(fg_color=self.theme_colors["text_primary"])
 
+
+    def update_ui_color_swatches(self):
+        """Refreshes the thumbnail color block objects visually."""
+        self.swatch_accent.configure(fg_color=self.theme_colors["accent"])
+        self.swatch_base.configure(fg_color=self.theme_colors["base_dark"])
+        self.swatch_surface.configure(fg_color=self.theme_colors["surface_panel"])
+        self.swatch_elevated.configure(fg_color=self.theme_colors["elevated_card"])
+        self.swatch_text.configure(fg_color=self.theme_colors["text_primary"])
+
     def apply_theme_colors_to_widgets(self):
-        """Redraws background framework frames instantly based on customization settings."""
+        """Redraws ALL background components, text colors, and frames across every tab interface."""
+        # 1. Base Framework Elements
         self.configure(fg_color=self.theme_colors["base_dark"])
         self.sidebar_frame.configure(fg_color=self.theme_colors["surface_panel"])
-        self.console_output.configure(fg_color=self.theme_colors["surface_panel"], border_color=self.theme_colors["elevated_card"])
+        self.app_title.configure(text_color=self.theme_colors["text_primary"])
         
+        # 2. Console Tab Elements
+        self.console_output.configure(
+            fg_color=self.theme_colors["surface_panel"], 
+            border_color=self.theme_colors["elevated_card"]
+        )
+        
+        # 3. Settings Tab Elements (Scroll frames and internal layout cards)
+        if "settings" in self.panes:
+            self.panes["settings"].configure(
+                fg_color=self.theme_colors["base_dark"], label_text_color=self.theme_colors["text_primary"]
+            )
+            for widget in self.panes["settings"].winfo_children():
+                if isinstance(widget, ctk.CTkFrame):
+                    widget.configure(fg_color=self.theme_colors["surface_panel"])
+                    for sub_w in widget.winfo_children():
+                        if isinstance(sub_w, ctk.CTkLabel):
+                            sub_w.configure(text_color=self.theme_colors["text_primary"])
+                        elif isinstance(sub_w, ctk.CTkEntry):
+                            sub_w.configure(fg_color=self.theme_colors["elevated_card"], text_color=self.theme_colors["text_primary"])
+                elif isinstance(widget, ctk.CTkSwitch):
+                    widget.configure(progress_color=self.theme_colors["accent"], text_color=self.theme_colors["text_primary"])
+            self.save_btn.configure(fg_color=self.theme_colors["accent"])
+
+        # 4. Appearance Tab Elements (Scroll frames and inner color blocks)
+        if "appearance" in self.panes:
+            self.panes["appearance"].configure(
+                fg_color=self.theme_colors["base_dark"], label_text_color=self.theme_colors["text_primary"]
+            )
+            for widget in self.panes["appearance"].winfo_children():
+                if isinstance(widget, ctk.CTkFrame):
+                    widget.configure(fg_color=self.theme_colors["surface_panel"])
+                    for sub_w in widget.winfo_children():
+                        if isinstance(sub_w, ctk.CTkLabel):
+                            sub_w.configure(text_color=self.theme_colors["text_primary"])
+                        elif isinstance(sub_w, ctk.CTkEntry):
+                            sub_w.configure(fg_color=self.theme_colors["elevated_card"], text_color=self.theme_colors["text_primary"])
+            self.theme_btn.configure(fg_color=self.theme_colors["accent"])
+
+        # 5. Sidebar Tab Select Navigation Buttons
         for view_id, btn in self.nav_buttons.items():
             btn.configure(hover_color=self.theme_colors["elevated_card"])
             if btn.cget("fg_color") != "transparent":
-                btn.configure(fg_color=self.theme_colors["accent"])
+                btn.configure(fg_color=self.theme_colors["accent"], text_color="#ffffff")
+            else:
+                btn.configure(text_color="#a0b0b5")
 
     def save_theme_from_ui(self):
         """Validates entry fields and saves theme customizations straight back to config.json."""
@@ -435,13 +488,13 @@ class WallpaperBridgeGUI(ctk.CTk):
         except Exception as e:
             self.write_to_console(f"[Theme Engine Exception] Failed to update visual elements: {e}\n")
 
+
     def save_settings_from_ui(self):
-        """Commits modified UI entries straight back into local config storage file tracks without overriding paths."""
+        """Commits modified UI entries straight back into local config storage file tracks."""
         try:
             with open(wp_engine_bridge.CONFIG_FILE, "r", encoding="utf-8") as f:
                 current_config = json.load(f)
 
-            # Map inputs directly over the configuration dictionary targets
             current_config["CTRLEM_LOG_PATH"] = self.entry_ctrlem.get().strip()
             current_config["PLAYCTRL_LOG_FOLDER"] = self.entry_playctrl.get().strip()
             current_config["MONITOR_WIDTH"] = int(self.entry_width.get().strip())
@@ -450,7 +503,6 @@ class WallpaperBridgeGUI(ctk.CTk):
             current_config["CTRLEM_EXE_PATH"] = self.entry_ctrlem_exe.get().strip()
             current_config["PLAYCTRL_EXE_PATH"] = self.entry_playctrl_exe.get().strip()
             
-            # Safe removal check cleanup loop to guarantee config.json stays completely clear of the parameter
             if "WALLPAPER_WORKSPACE_DIR" in current_config:
                 del current_config["WALLPAPER_WORKSPACE_DIR"]
             
@@ -459,7 +511,6 @@ class WallpaperBridgeGUI(ctk.CTk):
                 
             self.write_to_console("[System Config] Changes committed into 'config.json' successfully.\n")
             
-            # Hot-reload variables inside live running bridge context space instantly
             wp_engine_bridge.CTRLEM_LOG_PATH = current_config["CTRLEM_LOG_PATH"]
             wp_engine_bridge.PLAYCTRL_LOG_FOLDER = current_config["PLAYCTRL_LOG_FOLDER"]
             wp_engine_bridge.MONITOR_WIDTH = current_config["MONITOR_WIDTH"]
