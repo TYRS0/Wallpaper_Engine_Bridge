@@ -25,7 +25,7 @@ Setup
 <summary>If using GUI</summary> 
 
 6. Run `pip install requests apng pillow customtkinter psutil`
-7. Download the Wallpaper Bridge Folder from this Github
+7. Download the Wallpaper Bridge from [Latest Releases](https://github.com/TYRS0/Wallpaper_Engine_Bridge/releases/latest)
 8. Run gui.pyw
 9. Configure settings page
 	-  **CtrlEm Log** = (Your CtrlEm commands.log File)
