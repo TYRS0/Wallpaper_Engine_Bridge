@@ -10,7 +10,7 @@ Setup
 <details>
 <summary>If using CUI</summary>
 
-6. Run `pip install requests apng pillow customtkinter psutil`
+6. Run `pip install requests apng pillow`
 7. Download the wp_engine_bridge_CUI Folder from this Github
 8. Open config.json and Configure the script
 	-  **CTRLEM_LOG_PATH** = (Your CtrlEm commands.log File)
