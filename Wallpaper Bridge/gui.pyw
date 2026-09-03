@@ -4,6 +4,7 @@ import threading
 import time
 import customtkinter as ctk
 import psutil  
+from tkinter import filedialog  # 🛠️ ADDED: Native file browser dialogue hooks
 
 # Import all background parsing components directly from your bridge code
 import wp_engine_bridge
@@ -47,24 +48,15 @@ class WallpaperBridgeGUI(ctk.CTk):
         self.update_program_status_indicators()
 
     def create_sidebar_navigation(self):
-        """Constructs the left navigation rail mimicking the screenshot."""
-        self.sidebar_frame = ctk.CTkFrame(
-            self, width=180, corner_radius=0, 
-            fg_color=self.theme_colors["surface_panel"], border_width=0
-        )
+        """Constructs the left navigation rail cleanly mimicking structural specifications."""
+        self.sidebar_frame = ctk.CTkFrame(self, width=180, corner_radius=0, fg_color=self.theme_colors["surface_panel"], border_width=0)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(5, weight=1) # Adjusted for extra navigation row
+        self.sidebar_frame.grid_rowconfigure(5, weight=1)
 
-        # Top App Title Banner Hook
-        self.app_title = ctk.CTkLabel(
-            self.sidebar_frame, text="WE Bridge", 
-            font=ctk.CTkFont(size=16, weight="bold"), text_color="#ffffff"
-        )
+        self.app_title = ctk.CTkLabel(self.sidebar_frame, text="WE Bridge", font=ctk.CTkFont(size=16, weight="bold"), text_color="#ffffff")
         self.app_title.grid(row=0, column=0, padx=20, pady=25)
 
-        # Tab Selection Hooks - Container tracking matrices
         self.nav_buttons = {}
-        # Core permanent panels
         self.base_tabs = [("Console", "console"), ("Settings", "settings"), ("Appearance", "appearance")]
         
         for idx, (label, view_id) in enumerate(self.base_tabs, start=1):
@@ -77,7 +69,6 @@ class WallpaperBridgeGUI(ctk.CTk):
             btn.grid(row=idx, column=0, padx=12, pady=6, sticky="ew")
             self.nav_buttons[view_id] = btn
 
-        # 🛠️ DYNAMIC HOOK: Setup Debug Console Button Structure (Hidden initially by grid omission)
         self.btn_debug_console = ctk.CTkButton(
             self.sidebar_frame, text="Debug Console", anchor="w", height=40,
             corner_radius=8, fg_color="transparent", text_color="#a0b0b5",
@@ -86,116 +77,35 @@ class WallpaperBridgeGUI(ctk.CTk):
         )
         self.nav_buttons["debug_console"] = self.btn_debug_console
 
-        # Dual independent status monitoring tags shifted down
-        self.status_ctrlem = ctk.CTkLabel(
-            self.sidebar_frame, text="● CtrlEm: Scanning...", 
-            text_color="#f1c40f", font=ctk.CTkFont(size=11, weight="bold")
-        )
+        self.status_ctrlem = ctk.CTkLabel(self.sidebar_frame, text="● CtrlEm: Scanning...", text_color="#f1c40f", font=ctk.CTkFont(size=11, weight="bold"))
         self.status_ctrlem.grid(row=6, column=0, padx=20, pady=(5, 2), sticky="w")
 
-        self.status_playctrl = ctk.CTkLabel(
-            self.sidebar_frame, text="● PlayCtrl: Scanning...", 
-            text_color="#f1c40f", font=ctk.CTkFont(size=11, weight="bold")
-        )
+        self.status_playctrl = ctk.CTkLabel(self.sidebar_frame, text="● PlayCtrl: Scanning...", text_color="#f1c40f", font=ctk.CTkFont(size=11, weight="bold"))
         self.status_playctrl.grid(row=7, column=0, padx=20, pady=(2, 15), sticky="w")
 
-    def update_program_status_indicators(self):
-        """Asynchronously polls the running system processes to check status labels using config names."""
-        ctrlem_running = False
-        playctrl_running = False
-
-        ctrlem_exe_name = os.path.basename(wp_engine_bridge.CTRLEM_EXE_PATH).lower() if wp_engine_bridge.CTRLEM_EXE_PATH else "ctrlem.exe"
-        playctrl_exe_name = os.path.basename(wp_engine_bridge.PLAYCTRL_EXE_PATH).lower() if wp_engine_bridge.PLAYCTRL_EXE_PATH else "playctrl.exe"
-
+    def check_active_processes(self, c_target, p_target):
+        """Hunts through running application logs natively to identify active matches."""
+        c_running, p_running = False, False
         for proc in psutil.process_iter(['name']):
             try:
                 proc_name = proc.info['name'].lower()
-                if ctrlem_exe_name and proc_name == ctrlem_exe_name:
-                    ctrlem_running = True
-                if playctrl_exe_name and proc_name == playctrl_exe_name:
-                    playctrl_running = True
+                if c_target and proc_name == c_target: c_running = True
+                if p_target and proc_name == p_target: p_running = True
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 continue
-
-        if ctrlem_running:
-            self.status_ctrlem.configure(text="● CtrlEm: Active", text_color="#2ecc71")
-        else:
-            self.status_ctrlem.configure(text="● CtrlEm: Offline", text_color="#e74c3c")
-
-        if playctrl_running:
-            self.status_playctrl.configure(text="● PlayCtrl: Active", text_color="#2ecc71")
-        else:
-            self.status_playctrl.configure(text="● PlayCtrl: Offline", text_color="#e74c3c")
-
-        self.after(5000, self.update_program_status_indicators)
-
-    def write_to_console(self, complete_message_text):
-        """Thread-safely appends stream logs into the custom read-only text view space."""
-        self.after(0, lambda: self._append_text_execution(complete_message_text))
-
-    def _append_text_execution(self, text):
-        self.console_output.configure(state="normal")
-        self.console_output.insert("end", text)
-        self.console_output.see("end")
-        self.console_output.configure(state="disabled")
+        return c_running, p_running
 
     def update_program_status_indicators(self):
-        """Asynchronously polls the running system processes to check status labels."""
-        ctrlem_running = False
-        playctrl_running = False
+        """Refreshes structural labels dynamically based on background process scans."""
+        c_exe = os.path.basename(wp_engine_bridge.CTRLEM_EXE_PATH).lower() if wp_engine_bridge.CTRLEM_EXE_PATH else "ctrlem.exe"
+        p_exe = os.path.basename(wp_engine_bridge.PLAYCTRL_EXE_PATH).lower() if wp_engine_bridge.PLAYCTRL_EXE_PATH else "playctrl.exe"
 
-        # Scan running process tree lists natively
-        for proc in psutil.process_iter(['name']):
-            try:
-                proc_name = proc.info['name'].lower()
-                # Check for standard executable targets (adjust names if your executable files match differently)
-                if "ctrlem" in proc_name:
-                    ctrlem_running = True
-                if "playctrl" in proc_name:
-                    playctrl_running = True
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                continue
+        c_running, p_running = self.check_active_processes(c_exe, p_exe)
 
-        # Update CtrlEm Sidebar Display Elements
-        if ctrlem_running:
-            self.status_ctrlem.configure(text="● CtrlEm: Active", text_color="#2ecc71")
-        else:
-            self.status_ctrlem.configure(text="● CtrlEm: Offline", text_color="#e74c3c")
+        self.status_ctrlem.configure(text="● CtrlEm: Active" if c_running else "● CtrlEm: Offline", text_color="#2ecc71" if c_running else "#e74c3c")
+        self.status_playctrl.configure(text="● PlayCtrl: Active" if p_running else "● PlayCtrl: Offline", text_color="#2ecc71" if p_running else "#e74c3c")
 
-        # Update PlayCtrl Sidebar Display Elements
-        if playctrl_running:
-            self.status_playctrl.configure(text="● PlayCtrl: Active", text_color="#2ecc71")
-        else:
-            self.status_playctrl.configure(text="● PlayCtrl: Offline", text_color="#e74c3c")
-
-        # Automatically loop check sequences internally every 5000 milliseconds (5 seconds)
         self.after(5000, self.update_program_status_indicators)
-
-    def write_to_console(self, complete_message_text):
-        """Thread-safely appends stream logs into the custom read-only text view space."""
-        self.after(0, lambda: self._append_text_execution(complete_message_text))
-
-    def _append_text_execution(self, text):
-        self.console_output.configure(state="normal")
-        self.console_output.insert("end", text)
-        self.console_output.see("end")
-        self.console_output.configure(state="disabled")
-
-    def write_to_console(self, complete_message_text, is_debug_message=False):
-        """Thread-safely routes text strings straight into the correct UI logging component box."""
-        # Using .after ensures Tkinter processes layouts safely inside main loop context layers
-        if is_debug_message:
-            self.after(0, lambda: self._append_text_execution(self.debug_output, complete_message_text))
-        else:
-            # Production line messages get automatically duplicated down onto both text canvases
-            self.after(0, lambda: self._append_text_execution(self.console_output, complete_message_text))
-            self.after(0, lambda: self._append_text_execution(self.debug_output, complete_message_text))
-
-    def _append_text_execution(self, textbox_widget, text):
-        textbox_widget.configure(state="normal")
-        textbox_widget.insert("end", text)
-        textbox_widget.see("end")
-        textbox_widget.configure(state="disabled")
 
     def create_workspace_viewplanes(self):
         """Creates the container frames for the different functional sections."""
@@ -222,7 +132,7 @@ class WallpaperBridgeGUI(ctk.CTk):
         self.panes["console"] = console_pane
 
         # ----------------------------------------------------
-        # 🛠️ NEW VIEW PANEL: DEBUG CONSOLE SCREEN (Raw Verbose Background Diagnostics)
+        # VIEW PANEL: DEBUG CONSOLE SCREEN
         # ----------------------------------------------------
         debug_pane = ctk.CTkFrame(self, fg_color="transparent")
         debug_pane.grid_columnconfigure(0, weight=1)
@@ -232,7 +142,7 @@ class WallpaperBridgeGUI(ctk.CTk):
         d_title.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="w")
 
         self.debug_output = ctk.CTkTextbox(
-            debug_pane, fg_color=self.theme_colors["surface_panel"], text_color="#ffcc00", # Warn amber hue tint lines
+            debug_pane, fg_color=self.theme_colors["surface_panel"], text_color="#ffcc00",
             font=ctk.CTkFont(family="Consolas", size=12), corner_radius=12,
             border_width=1, border_color=self.theme_colors["elevated_card"]
         )
@@ -244,7 +154,6 @@ class WallpaperBridgeGUI(ctk.CTk):
         # ----------------------------------------------------
         # VIEW PANEL: SETTINGS CONFIGURATION ENGINE
         # ----------------------------------------------------
-        # REMOVED: Redundant top banner label component configuration headers
         settings_pane = ctk.CTkScrollableFrame(self, fg_color="transparent")
         settings_pane.grid_columnconfigure(0, weight=1)
         
@@ -252,32 +161,44 @@ class WallpaperBridgeGUI(ctk.CTk):
         path_card.pack(fill="x", padx=10, pady=10)
         path_card.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(path_card, text="LOG & EXECUTABLE PATHS", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, padx=15, pady=10, sticky="w")
+        ctk.CTkLabel(path_card, text="LOG & EXECUTABLE PATHS", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=3, padx=15, pady=10, sticky="w")
         
-        # CtrlEm input targets
+        # CtrlEm Log Input + Picker Button
         ctk.CTkLabel(path_card, text="CtrlEm Log:").grid(row=1, column=0, padx=15, pady=5, sticky="w")
         self.entry_ctrlem = ctk.CTkEntry(path_card, fg_color=self.theme_colors["elevated_card"])
-        self.entry_ctrlem.grid(row=1, column=1, padx=15, pady=5, sticky="ew")
+        self.entry_ctrlem.grid(row=1, column=1, padx=(15, 5), pady=5, sticky="ew")
+        self.btn_pick_ctrlem_log = ctk.CTkButton(path_card, text="Browse...", width=80, command=self.browse_ctrlem_log)
+        self.btn_pick_ctrlem_log.grid(row=1, column=2, padx=(5, 15), pady=5)
 
+        # CtrlEm Exe Input + Picker Button
         ctk.CTkLabel(path_card, text="CtrlEm Exe Path:").grid(row=2, column=0, padx=15, pady=5, sticky="w")
         self.entry_ctrlem_exe = ctk.CTkEntry(path_card, fg_color=self.theme_colors["elevated_card"])
-        self.entry_ctrlem_exe.grid(row=2, column=1, padx=15, pady=5, sticky="ew")
-
-        # PlayCtrl input targets
+        self.entry_ctrlem_exe.grid(row=2, column=1, padx=(15, 5), pady=5, sticky="ew")
+        self.btn_pick_ctrlem_exe = ctk.CTkButton(path_card, text="Browse...", width=80, command=self.browse_ctrlem_exe)
+        self.btn_pick_ctrlem_exe.grid(row=2, column=2, padx=(5, 15), pady=5)
+        
+        # PlayCtrl Log Folder Input + Picker Button
         ctk.CTkLabel(path_card, text="PlayCtrl Log Folder:").grid(row=3, column=0, padx=15, pady=5, sticky="w")
         self.entry_playctrl = ctk.CTkEntry(path_card, fg_color=self.theme_colors["elevated_card"])
-        self.entry_playctrl.grid(row=3, column=1, padx=15, pady=5, sticky="ew")
+        self.entry_playctrl.grid(row=3, column=1, padx=(15, 5), pady=5, sticky="ew")
+        self.btn_pick_playctrl_folder = ctk.CTkButton(path_card, text="Browse...", width=80, command=self.browse_playctrl_folder)
+        self.btn_pick_playctrl_folder.grid(row=3, column=2, padx=(5, 15), pady=5)
 
+        # PlayCtrl Exe Input + Picker Button
         ctk.CTkLabel(path_card, text="PlayCtrl Exe Path:").grid(row=4, column=0, padx=15, pady=5, sticky="w")
         self.entry_playctrl_exe = ctk.CTkEntry(path_card, fg_color=self.theme_colors["elevated_card"])
-        self.entry_playctrl_exe.grid(row=4, column=1, padx=15, pady=5, sticky="ew")
+        self.entry_playctrl_exe.grid(row=4, column=1, padx=(15, 5), pady=5, sticky="ew")
+        self.btn_pick_playctrl_exe = ctk.CTkButton(path_card, text="Browse...", width=80, command=self.browse_playctrl_exe)
+        self.btn_pick_playctrl_exe.grid(row=4, column=2, padx=(5, 15), pady=5)
 
-        # ADDED: Wallpaper Engine CLI tracker entry box layout parameters
+        # Wallpaper Engine Exe Input + Picker Button
         ctk.CTkLabel(path_card, text="WE Exe Path:").grid(row=5, column=0, padx=15, pady=5, sticky="w")
         self.entry_we_exe = ctk.CTkEntry(path_card, fg_color=self.theme_colors["elevated_card"])
-        self.entry_we_exe.grid(row=5, column=1, padx=15, pady=5, sticky="ew")
+        self.entry_we_exe.grid(row=5, column=1, padx=(15, 5), pady=5, sticky="ew")
+        self.btn_pick_we_exe = ctk.CTkButton(path_card, text="Browse...", width=80, command=self.browse_we_exe)
+        self.btn_pick_we_exe.grid(row=5, column=2, padx=(5, 15), pady=5)
 
-        # Hardware panel size configurations
+        # Monitor layout parameters
         hw_card = ctk.CTkFrame(settings_pane, fg_color=self.theme_colors["surface_panel"], corner_radius=12)
         hw_card.pack(fill="x", padx=10, pady=10)
         hw_card.grid_columnconfigure(1, weight=1)
@@ -292,18 +213,10 @@ class WallpaperBridgeGUI(ctk.CTk):
         self.entry_height = ctk.CTkEntry(hw_card, fg_color=self.theme_colors["elevated_card"])
         self.entry_height.grid(row=2, column=1, padx=15, pady=5, sticky="ew")
 
-        # SHORTENED LABEL: Toggle Debug Mode text formatting update
-        self.switch_debug = ctk.CTkSwitch(
-            settings_pane, text="Toggle Debug Mode",
-            progress_color=self.theme_colors["accent"]
-        )
+        self.switch_debug = ctk.CTkSwitch(settings_pane, text="Toggle Debug Mode", progress_color=self.theme_colors["accent"])
         self.switch_debug.pack(padx=15, pady=15, anchor="w")
 
-        self.save_btn = ctk.CTkButton(
-            settings_pane, text="Save Configurations Changes",
-            fg_color=self.theme_colors["accent"], hover_color="#bd2623",
-            command=self.save_settings_from_ui
-        )
+        self.save_btn = ctk.CTkButton(settings_pane, text="Save Configurations Changes", fg_color=self.theme_colors["accent"], hover_color="#bd2623", command=self.save_settings_from_ui)
         self.save_btn.pack(pady=20)
 
         self.panes["settings"] = settings_pane
@@ -311,7 +224,6 @@ class WallpaperBridgeGUI(ctk.CTk):
         # ----------------------------------------------------
         # VIEW PANEL: APPEARANCE PREVIEW & INTERACTIVE FIELDS
         # ----------------------------------------------------
-        # REMOVED: Redundant top banner label component configuration headers
         appearance_pane = ctk.CTkScrollableFrame(self, fg_color="transparent")
         appearance_pane.grid_columnconfigure(0, weight=1)
 
@@ -361,18 +273,13 @@ class WallpaperBridgeGUI(ctk.CTk):
         self.entry_text = ctk.CTkEntry(txt_frame, fg_color=self.theme_colors["elevated_card"])
         self.entry_text.grid(row=1, column=2, padx=15, pady=10, sticky="ew")
 
-        self.theme_btn = ctk.CTkButton(
-            appearance_pane, text="Apply & Save Theme Changes",
-            fg_color=self.theme_colors["accent"], hover_color="#bd2623",
-            command=self.save_theme_from_ui
-        )
+        self.theme_btn = ctk.CTkButton(appearance_pane, text="Apply & Save Theme Changes", fg_color=self.theme_colors["accent"], hover_color="#bd2623", command=self.save_theme_from_ui)
         self.theme_btn.pack(pady=20)
 
         self.panes["appearance"] = appearance_pane
 
     def select_tab_pane(self, target_view):
         """Manages structural visibility states and styles tabs on selection."""
-        # Safety fallback: If target view gets hidden while open, revert view focus back to master console
         if target_view == "debug_console" and not wp_engine_bridge.DEBUG_MODE:
             target_view = "console"
 
@@ -387,11 +294,23 @@ class WallpaperBridgeGUI(ctk.CTk):
     def toggle_debug_navigation_visibility(self, should_show_tab):
         """Dynamically inserts or drops the Debug Console button from the layout wireframes."""
         if should_show_tab:
-            # Place button right below your 'Appearance' tab element (row index position 4)
             self.btn_debug_console.grid(row=4, column=0, padx=12, pady=6, sticky="ew")
         else:
-            # Drop from UI visibility without clearing out internal state memory allocations
             self.btn_debug_console.grid_forget()
+
+    def write_to_console(self, complete_message_text, is_debug_message=False):
+        """Thread-safely routes text strings straight into the correct UI logging component box."""
+        if is_debug_message:
+            self.after(0, lambda: self._append_text_execution(self.debug_output, complete_message_text))
+        else:
+            self.after(0, lambda: self._append_text_execution(self.console_output, complete_message_text))
+            self.after(0, lambda: self._append_text_execution(self.debug_output, complete_message_text))
+
+    def _append_text_execution(self, textbox_widget, text):
+        textbox_widget.configure(state="normal")
+        textbox_widget.insert("end", text)
+        textbox_widget.see("end")
+        textbox_widget.configure(state="disabled")
 
     def load_settings_into_ui(self):
         """Hydrates GUI entry inputs safely with live config.json variables."""
@@ -411,6 +330,7 @@ class WallpaperBridgeGUI(ctk.CTk):
                 self.switch_debug.deselect()
                 self.toggle_debug_navigation_visibility(should_show_tab=False)
             
+            # FIX: Harmonized the internal dictionary keys to prevent loading drops
             self.theme_colors["accent"] = wp_engine_bridge.config.get("THEME_ACCENT", "#dc322f")
             self.theme_colors["base_dark"] = wp_engine_bridge.config.get("THEME_BASE", "#002a35")
             self.theme_colors["surface_panel"] = wp_engine_bridge.config.get("THEME_SURFACE", "#053542")
@@ -436,74 +356,103 @@ class WallpaperBridgeGUI(ctk.CTk):
         self.swatch_elevated.configure(fg_color=self.theme_colors["elevated_card"])
         self.swatch_text.configure(fg_color=self.theme_colors["text_primary"])
 
+    def browse_ctrlem_log(self):
+        """Opens a standard file browser pointing to .log targets."""
+        selected_file = filedialog.askopenfilename(filetypes=[("Log Files", "*.log"), ("All Files", "*.*")])
+        if selected_file:
+            self.entry_ctrlem.delete(0, "end")
+            self.entry_ctrlem.insert(0, selected_file)
+
+    def browse_ctrlem_exe(self):
+        """Opens a standard file browser targeting application files."""
+        selected_file = filedialog.askopenfilename(filetypes=[("Executable Files", "*.exe"), ("All Files", "*.*")])
+        if selected_file:
+            self.entry_ctrlem_exe.delete(0, "end")
+            self.entry_ctrlem_exe.insert(0, selected_file)
+
+    def browse_playctrl_folder(self):
+        """Opens a standard directory tree picker window pane."""
+        selected_dir = filedialog.askdirectory()
+        if selected_dir:
+            self.entry_playctrl.delete(0, "end")
+            self.entry_playctrl.insert(0, selected_dir)
+
+    def browse_playctrl_exe(self):
+        """Opens a file dialog for the client executable."""
+        selected_file = filedialog.askopenfilename(filetypes=[("Executable Files", "*.exe"), ("All Files", "*.*")])
+        if selected_file:
+            self.entry_playctrl_exe.delete(0, "end")
+            self.entry_playctrl_exe.insert(0, selected_file)
+
+    def browse_we_exe(self):
+        """Locates the wallpaper engine rendering engine file."""
+        selected_file = filedialog.askopenfilename(filetypes=[("Wallpaper Engine Executable", "wallpaper64.exe;wallpaper.exe"), ("All Files", "*.*")])
+        if selected_file:
+            self.entry_we_exe.delete(0, "end")
+            self.entry_we_exe.insert(0, selected_file)
+
     def apply_theme_colors_to_widgets(self):
         """Redraws ALL background components, text colors, and frames across every tab interface."""
-        # 1. Base Framework Elements
+        # 1. Base Window & Sidebar Framework Elements
         self.configure(fg_color=self.theme_colors["base_dark"])
         self.sidebar_frame.configure(fg_color=self.theme_colors["surface_panel"])
         self.app_title.configure(text_color=self.theme_colors["text_primary"])
         
-        # 2. Console Tab Elements (Both clean and diagnostic viewers)
-        self.console_output.configure(fg_color=self.theme_colors["surface_panel"], border_color=self.theme_colors["elevated_card"])
-        self.debug_output.configure(fg_color=self.theme_colors["surface_panel"], border_color=self.theme_colors["elevated_card"])
+        # 2. Console Tab Elements (Clean Output Viewer & Hidden Debug Diagnostics Tracker)
+        self.console_output.configure(
+            fg_color=self.theme_colors["surface_panel"], 
+            border_color=self.theme_colors["elevated_card"]
+        )
+        self.debug_output.configure(
+            fg_color=self.theme_colors["surface_panel"], 
+            border_color=self.theme_colors["elevated_card"]
+        )
         
-        # 3. Settings Tab Elements
-        if "settings" in self.panes:
-            self.panes["settings"].configure(fg_color=self.theme_colors["base_dark"])
-            for widget in self.panes["settings"].winfo_children():
-                if isinstance(widget, ctk.CTkFrame):
-                    widget.configure(fg_color=self.theme_colors["surface_panel"])
-                    for sub_w in widget.winfo_children():
-                        if isinstance(sub_w, ctk.CTkLabel):
-                            sub_w.configure(text_color=self.theme_colors["text_primary"])
-                        elif isinstance(sub_w, ctk.CTkEntry):
-                            sub_w.configure(fg_color=self.theme_colors["elevated_card"], text_color=self.theme_colors["text_primary"])
-                elif isinstance(widget, ctk.CTkSwitch):
-                    widget.configure(progress_color=self.theme_colors["accent"], text_color=self.theme_colors["text_primary"])
-            self.save_btn.configure(fg_color=self.theme_colors["accent"])
-
-        # 4. Appearance Tab Elements
-        if "appearance" in self.panes:
-            self.panes["appearance"].configure(fg_color=self.theme_colors["base_dark"])
-            for widget in self.panes["appearance"].winfo_children():
-                if isinstance(widget, ctk.CTkFrame):
-                    widget.configure(fg_color=self.theme_colors["surface_panel"])
-                    for sub_w in widget.winfo_children():
-                        if isinstance(sub_w, ctk.CTkLabel):
-                            sub_w.configure(text_color=self.theme_colors["text_primary"])
-                        elif isinstance(sub_w, ctk.CTkEntry):
-                            sub_w.configure(fg_color=self.theme_colors["elevated_card"], text_color=self.theme_colors["text_primary"])
-            self.theme_btn.configure(fg_color=self.theme_colors["accent"])
-
-        # 5. Sidebar Tab Select Navigation Buttons
+        # 3. Sidebar Tab Select Navigation Buttons & Active Status Indicators
         for view_id, btn in self.nav_buttons.items():
             btn.configure(hover_color=self.theme_colors["elevated_card"])
             if btn.cget("fg_color") != "transparent":
                 btn.configure(fg_color=self.theme_colors["accent"], text_color="#ffffff")
             else:
+                # FIX: Forces inactive sidebar text strings to blend with your secondary highlights
                 btn.configure(text_color="#a0b0b5")
+
+        # 4. Settings & Appearance Viewplanes (Your optimized loop logic)
+        for pane_key in ["settings", "appearance"]:
+            if pane_key in self.panes:
+                self.panes[pane_key].configure(fg_color=self.theme_colors["base_dark"])
+                for widget in self.panes[pane_key].winfo_children():
+                    if isinstance(widget, ctk.CTkFrame):
+                        widget.configure(fg_color=self.theme_colors["surface_panel"])
+                        for sub_w in widget.winfo_children():
+                            if isinstance(sub_w, ctk.CTkLabel): 
+                                sub_w.configure(text_color=self.theme_colors["text_primary"])
+                            elif isinstance(sub_w, ctk.CTkEntry): 
+                                sub_w.configure(fg_color=self.theme_colors["elevated_card"], text_color=self.theme_colors["text_primary"])
+                            elif isinstance(sub_w, ctk.CTkButton):
+                                sub_w.configure(fg_color=self.theme_colors["accent"])
+                    elif isinstance(widget, ctk.CTkSwitch):
+                        widget.configure(progress_color=self.theme_colors["accent"], text_color=self.theme_colors["text_primary"])
+                        
+        # 5. Core Operational Action Buttons
+        self.save_btn.configure(fg_color=self.theme_colors["accent"])
+        self.theme_btn.configure(fg_color=self.theme_colors["accent"])
 
     def save_theme_from_ui(self):
         """Validates entry fields and saves theme customizations straight back to config.json."""
         try:
-            def clean_hex(val):
-                s = val.strip()
-                return s if s.startswith("#") else f"#{s}"
-
-            self.theme_colors["accent"] = clean_hex(self.entry_accent.get())
-            self.theme_colors["base_dark"] = clean_hex(self.entry_base.get())
-            self.theme_colors["surface_panel"] = clean_hex(self.entry_surface.get())
-            self.theme_colors["elevated_card"] = clean_hex(self.entry_elevated.get())
-            self.theme_colors["text_primary"] = clean_hex(self.entry_text.get())
+            clean_hex = lambda val: val.strip() if val.strip().startswith("#") else f"#{val.strip()}"
+            for key, entry in [("accent", self.entry_accent), ("base_dark", self.entry_base),
+                               ("surface_panel", self.entry_surface), ("elevated_card", self.entry_elevated),
+                               ("text_primary", self.entry_text)]:
+                self.theme_colors[key] = clean_hex(entry.get())
 
             with open(wp_engine_bridge.CONFIG_FILE, "r", encoding="utf-8") as f:
                 current_config = json.load(f)
 
-            current_config["THEME_ACCENT"] = self.theme_colors["accent"]
-            current_config["THEME_BASE"] = self.theme_colors["base_dark"]
-            current_config["THEME_SURFACE"] = self.theme_colors["surface_panel"]
-            current_config["THEME_ELEVATED"] = self.theme_colors["elevated_card"]
-            current_config["THEME_TEXT"] = self.theme_colors["text_primary"]
+            mapping = {"THEME_ACCENT": "accent", "THEME_BASE": "base_dark", "THEME_SURFACE": "surface_panel", "THEME_ELEVATED": "elevated_card", "THEME_TEXT": "text_primary"}
+            for conf_k, local_v in mapping.items():
+                current_config[conf_k] = self.theme_colors[local_v]
 
             with open(wp_engine_bridge.CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(current_config, f, indent=4)
@@ -513,7 +462,7 @@ class WallpaperBridgeGUI(ctk.CTk):
             self.apply_theme_colors_to_widgets()
             self.write_to_console("[Theme System] Theme settings compiled and applied successfully.\n")
         except Exception as e:
-            self.write_to_console(f"[Theme Engine Exception] Failed to update visual elements: {e}\n")
+            self.write_to_console(f"[Theme Engine Exception] Failed to update: {e}\n")
 
     def save_settings_from_ui(self):
         """Commits modified UI entries straight back into local config storage file tracks."""
@@ -538,7 +487,6 @@ class WallpaperBridgeGUI(ctk.CTk):
                 
             self.write_to_console("[System Config] Changes committed into 'config.json' successfully.\n")
             
-            # Hot-reload variables inside live running bridge context track paths
             wp_engine_bridge.CTRLEM_LOG_PATH = current_config["CTRLEM_LOG_PATH"]
             wp_engine_bridge.PLAYCTRL_LOG_FOLDER = current_config["PLAYCTRL_LOG_FOLDER"]
             wp_engine_bridge.MONITOR_WIDTH = current_config["MONITOR_WIDTH"]
@@ -548,23 +496,17 @@ class WallpaperBridgeGUI(ctk.CTk):
             wp_engine_bridge.PLAYCTRL_EXE_PATH = current_config["PLAYCTRL_EXE_PATH"]
             wp_engine_bridge.WE_EXE_PATH = current_config["WE_EXE_PATH"]
 
-            # 🛠️ DYNAMIC SWITCH EVENT LOOKUP: Add or remove button instantly based on click state
             self.toggle_debug_navigation_visibility(should_show_tab=wp_engine_bridge.DEBUG_MODE)
             if not wp_engine_bridge.DEBUG_MODE:
-                self.select_tab_pane("console") # Safety auto-route back home if current view gets dropped
-
+                self.select_tab_pane("console")
         except Exception as e:
-            self.write_to_console(f"[Configuration Save Error] Failed to export settings data: {e}\n", is_debug_message=True)
+            self.write_to_console(f"[Configuration Save Error] Failed to export settings: {e}\n", is_debug_message=True)
 
-# --- CENTRALIZED EXECUTION HOOK CONTROLLER ---
 if __name__ == "__main__":
     app = WallpaperBridgeGUI()
     wp_engine_bridge.gui_instance = app
     
-    ctrlem_worker = threading.Thread(target=wp_engine_bridge.monitor_ctrlem_command_stream, daemon=True)
-    playctrl_worker = threading.Thread(target=wp_engine_bridge.monitor_playctrl_daily_json_streams, daemon=True)
-    
-    ctrlem_worker.start()
-    playctrl_worker.start()
+    threading.Thread(target=wp_engine_bridge.monitor_ctrlem_command_stream, daemon=True).start()
+    threading.Thread(target=wp_engine_bridge.monitor_playctrl_daily_json_streams, daemon=True).start()
 
     app.mainloop()

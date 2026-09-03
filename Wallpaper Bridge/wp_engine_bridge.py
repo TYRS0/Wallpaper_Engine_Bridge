@@ -86,6 +86,7 @@ def log_message(text, is_debug=True, source_app=None, source_group=None):
         print(formatted_msg)
         if gui_instance is not None:
             try:
+                # Passes the is_debug_message boolean flag to route logs to the right textbox
                 gui_instance.write_to_console(formatted_msg + "\n", is_debug_message=is_debug)
             except Exception:
                 pass
