@@ -130,7 +130,6 @@ class WallpaperBridgeGUI(ctk.CTk):
         self.console_output.see("end")
         self.console_output.configure(state="disabled")
 
-   
     def update_program_status_indicators(self):
         """Asynchronously polls the running system processes to check status labels."""
         ctrlem_running = False
@@ -212,12 +211,8 @@ class WallpaperBridgeGUI(ctk.CTk):
         # ----------------------------------------------------
         # VIEW PANEL: SETTINGS CONFIGURATION ENGINE
         # ----------------------------------------------------
-        settings_pane = ctk.CTkScrollableFrame(
-            self, fg_color="transparent", 
-            label_text="APPLICATION CORE CONFIGURATION",
-            label_font=ctk.CTkFont(size=14, weight="bold"),
-            label_text_color="#ffffff"
-        )
+        # REMOVED: Redundant top banner label component configuration headers
+        settings_pane = ctk.CTkScrollableFrame(self, fg_color="transparent")
         settings_pane.grid_columnconfigure(0, weight=1)
         
         path_card = ctk.CTkFrame(settings_pane, fg_color=self.theme_colors["surface_panel"], corner_radius=12)
@@ -226,7 +221,7 @@ class WallpaperBridgeGUI(ctk.CTk):
 
         ctk.CTkLabel(path_card, text="LOG & EXECUTABLE PATHS", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, padx=15, pady=10, sticky="w")
         
-        # CtrlEm Logs and Executables entries
+        # CtrlEm input targets
         ctk.CTkLabel(path_card, text="CtrlEm Log:").grid(row=1, column=0, padx=15, pady=5, sticky="w")
         self.entry_ctrlem = ctk.CTkEntry(path_card, fg_color=self.theme_colors["elevated_card"])
         self.entry_ctrlem.grid(row=1, column=1, padx=15, pady=5, sticky="ew")
@@ -235,7 +230,7 @@ class WallpaperBridgeGUI(ctk.CTk):
         self.entry_ctrlem_exe = ctk.CTkEntry(path_card, fg_color=self.theme_colors["elevated_card"])
         self.entry_ctrlem_exe.grid(row=2, column=1, padx=15, pady=5, sticky="ew")
 
-        # PlayCtrl Logs and Executables entries
+        # PlayCtrl input targets
         ctk.CTkLabel(path_card, text="PlayCtrl Log Folder:").grid(row=3, column=0, padx=15, pady=5, sticky="w")
         self.entry_playctrl = ctk.CTkEntry(path_card, fg_color=self.theme_colors["elevated_card"])
         self.entry_playctrl.grid(row=3, column=1, padx=15, pady=5, sticky="ew")
@@ -244,7 +239,12 @@ class WallpaperBridgeGUI(ctk.CTk):
         self.entry_playctrl_exe = ctk.CTkEntry(path_card, fg_color=self.theme_colors["elevated_card"])
         self.entry_playctrl_exe.grid(row=4, column=1, padx=15, pady=5, sticky="ew")
 
-        # Hardware display resolution configurations
+        # ADDED: Wallpaper Engine CLI tracker entry box layout parameters
+        ctk.CTkLabel(path_card, text="WE Exe Path:").grid(row=5, column=0, padx=15, pady=5, sticky="w")
+        self.entry_we_exe = ctk.CTkEntry(path_card, fg_color=self.theme_colors["elevated_card"])
+        self.entry_we_exe.grid(row=5, column=1, padx=15, pady=5, sticky="ew")
+
+        # Hardware panel size configurations
         hw_card = ctk.CTkFrame(settings_pane, fg_color=self.theme_colors["surface_panel"], corner_radius=12)
         hw_card.pack(fill="x", padx=10, pady=10)
         hw_card.grid_columnconfigure(1, weight=1)
@@ -259,8 +259,9 @@ class WallpaperBridgeGUI(ctk.CTk):
         self.entry_height = ctk.CTkEntry(hw_card, fg_color=self.theme_colors["elevated_card"])
         self.entry_height.grid(row=2, column=1, padx=15, pady=5, sticky="ew")
 
+        # SHORTENED LABEL: Toggle Debug Mode text formatting update
         self.switch_debug = ctk.CTkSwitch(
-            settings_pane, text="Toggle Debug Mode Stream Output",
+            settings_pane, text="Toggle Debug Mode",
             progress_color=self.theme_colors["accent"]
         )
         self.switch_debug.pack(padx=15, pady=15, anchor="w")
@@ -277,12 +278,8 @@ class WallpaperBridgeGUI(ctk.CTk):
         # ----------------------------------------------------
         # VIEW PANEL: APPEARANCE PREVIEW & INTERACTIVE FIELDS
         # ----------------------------------------------------
-        appearance_pane = ctk.CTkScrollableFrame(
-            self, fg_color="transparent",
-            label_text="THEMING ENVIRONMENT",
-            label_font=ctk.CTkFont(size=14, weight="bold"),
-            label_text_color="#ffffff"
-        )
+        # REMOVED: Redundant top banner label component configuration headers
+        appearance_pane = ctk.CTkScrollableFrame(self, fg_color="transparent")
         appearance_pane.grid_columnconfigure(0, weight=1)
 
         acc_frame = ctk.CTkFrame(appearance_pane, fg_color=self.theme_colors["surface_panel"], corner_radius=12)
@@ -363,6 +360,9 @@ class WallpaperBridgeGUI(ctk.CTk):
             self.entry_height.insert(0, str(wp_engine_bridge.MONITOR_HEIGHT))
             self.entry_ctrlem_exe.insert(0, wp_engine_bridge.CTRLEM_EXE_PATH)
             self.entry_playctrl_exe.insert(0, wp_engine_bridge.PLAYCTRL_EXE_PATH)
+            
+            # HYDRATE: Read and populate the current Wallpaper Engine CLI path tracking variable
+            self.entry_we_exe.insert(0, wp_engine_bridge.WE_EXE_PATH)
 
             if getattr(wp_engine_bridge, "DEBUG_MODE", False):
                 self.switch_debug.select()
@@ -394,15 +394,6 @@ class WallpaperBridgeGUI(ctk.CTk):
         self.swatch_elevated.configure(fg_color=self.theme_colors["elevated_card"])
         self.swatch_text.configure(fg_color=self.theme_colors["text_primary"])
 
-
-    def update_ui_color_swatches(self):
-        """Refreshes the thumbnail color block objects visually."""
-        self.swatch_accent.configure(fg_color=self.theme_colors["accent"])
-        self.swatch_base.configure(fg_color=self.theme_colors["base_dark"])
-        self.swatch_surface.configure(fg_color=self.theme_colors["surface_panel"])
-        self.swatch_elevated.configure(fg_color=self.theme_colors["elevated_card"])
-        self.swatch_text.configure(fg_color=self.theme_colors["text_primary"])
-
     def apply_theme_colors_to_widgets(self):
         """Redraws ALL background components, text colors, and frames across every tab interface."""
         # 1. Base Framework Elements
@@ -418,9 +409,7 @@ class WallpaperBridgeGUI(ctk.CTk):
         
         # 3. Settings Tab Elements (Scroll frames and internal layout cards)
         if "settings" in self.panes:
-            self.panes["settings"].configure(
-                fg_color=self.theme_colors["base_dark"], label_text_color=self.theme_colors["text_primary"]
-            )
+            self.panes["settings"].configure(fg_color=self.theme_colors["base_dark"])
             for widget in self.panes["settings"].winfo_children():
                 if isinstance(widget, ctk.CTkFrame):
                     widget.configure(fg_color=self.theme_colors["surface_panel"])
@@ -435,9 +424,7 @@ class WallpaperBridgeGUI(ctk.CTk):
 
         # 4. Appearance Tab Elements (Scroll frames and inner color blocks)
         if "appearance" in self.panes:
-            self.panes["appearance"].configure(
-                fg_color=self.theme_colors["base_dark"], label_text_color=self.theme_colors["text_primary"]
-            )
+            self.panes["appearance"].configure(fg_color=self.theme_colors["base_dark"])
             for widget in self.panes["appearance"].winfo_children():
                 if isinstance(widget, ctk.CTkFrame):
                     widget.configure(fg_color=self.theme_colors["surface_panel"])
@@ -488,7 +475,6 @@ class WallpaperBridgeGUI(ctk.CTk):
         except Exception as e:
             self.write_to_console(f"[Theme Engine Exception] Failed to update visual elements: {e}\n")
 
-
     def save_settings_from_ui(self):
         """Commits modified UI entries straight back into local config storage file tracks."""
         try:
@@ -503,6 +489,9 @@ class WallpaperBridgeGUI(ctk.CTk):
             current_config["CTRLEM_EXE_PATH"] = self.entry_ctrlem_exe.get().strip()
             current_config["PLAYCTRL_EXE_PATH"] = self.entry_playctrl_exe.get().strip()
             
+            # EXPORT: Grab the text box entry string data for the engine path variable
+            current_config["WE_EXE_PATH"] = self.entry_we_exe.get().strip()
+            
             if "WALLPAPER_WORKSPACE_DIR" in current_config:
                 del current_config["WALLPAPER_WORKSPACE_DIR"]
             
@@ -511,6 +500,7 @@ class WallpaperBridgeGUI(ctk.CTk):
                 
             self.write_to_console("[System Config] Changes committed into 'config.json' successfully.\n")
             
+            # Hot-reload variables inside live running bridge context track paths
             wp_engine_bridge.CTRLEM_LOG_PATH = current_config["CTRLEM_LOG_PATH"]
             wp_engine_bridge.PLAYCTRL_LOG_FOLDER = current_config["PLAYCTRL_LOG_FOLDER"]
             wp_engine_bridge.MONITOR_WIDTH = current_config["MONITOR_WIDTH"]
@@ -518,9 +508,9 @@ class WallpaperBridgeGUI(ctk.CTk):
             wp_engine_bridge.DEBUG_MODE = current_config["DEBUG_MODE"]
             wp_engine_bridge.CTRLEM_EXE_PATH = current_config["CTRLEM_EXE_PATH"]
             wp_engine_bridge.PLAYCTRL_EXE_PATH = current_config["PLAYCTRL_EXE_PATH"]
+            wp_engine_bridge.WE_EXE_PATH = current_config["WE_EXE_PATH"]
         except Exception as e:
             self.write_to_console(f"[Configuration Save Error] Failed to export settings data: {e}\n")
-
 
 # --- CENTRALIZED EXECUTION HOOK CONTROLLER ---
 if __name__ == "__main__":
